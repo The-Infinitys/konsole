@@ -342,6 +342,26 @@ TerminalDisplay::TerminalDisplay(QWidget *parent)
   _printManager.reset(new KonsolePrintManager(ldrawBackground, ldrawContents,
                                               lgetBackgroundColor));
   ubidi = ubidi_open();
+
+  // The Infinity's
+  animationTimer = new QTimer(this);
+  connect(animationTimer, &QTimer::timeout, this, [this]() {
+    // Kitty風の補間ロジック
+    // 毎フレーム 20% ずつ目標に近づける例
+    qreal step = 0.2;
+    qreal newX = currentCursorRect.x() +
+                 (targetCursorRect.x() - currentCursorRect.x()) * step;
+    qreal newY = currentCursorRect.y() +
+                 (targetCursorRect.y() - currentCursorRect.y()) * step;
+
+    currentCursorRect.moveTo(newX, newY);
+
+    // 目標に十分近づいたらタイマー停止
+    if (qAbs(currentCursorRect.x() - targetCursorRect.x()) < 0.1 &&
+        qAbs(currentCursorRect.y() - targetCursorRect.y()) < 0.1) {
+    }
+    update(); // 画面を書き直す指示
+  });
 }
 
 TerminalDisplay::~TerminalDisplay() {
