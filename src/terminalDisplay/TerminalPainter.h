@@ -10,6 +10,7 @@
 #define TERMINALPAINTER_HPP
 
 // Qt
+#include <QPolygonF>
 #include <QRectF>
 #include <QVariantAnimation>
 #include <QVector>
@@ -133,11 +134,11 @@ private:
                             QColor oldColor,
                             QFont::Weight normalWeight,
                             QFont::Weight boldWeight);
-    void updateCursorAnimation(const QVariant &value);
+    void updateCursorAnimation(const QVariant &value); // 引数の QVariant は内部で QPolygonF を扱う
     void onCursorPositionChanged(const QRectF &oldRect, const QRectF &newRect);
     QVariantAnimation *m_cursorAnim;
-    QRectF m_lastTargetRect; // 前回の論理位置（変更検知用）
-    QRectF m_animatedCursorRect;
+    QRectF m_lastTargetRect;
+    QPolygonF m_animatedCursorPolygon;
 };
 
 }

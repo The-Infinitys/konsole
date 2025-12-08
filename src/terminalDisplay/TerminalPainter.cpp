@@ -40,28 +40,77 @@ const QChar LTR_OVERRIDE_CHAR(0x202D);
 
 namespace Konsole
 {
+QVariant interpolatePolygonF(const QPolygonF &start, const QPolygonF &end, qreal progress)
+{
+    if (start.size() != end.size())
+        return end; // サイズが違う場合は補間不可
+
+    QPolygonF result;
+    for (int i = 0; i < start.size(); ++i) {
+        QPointF p = start[i] + (end[i] - start[i]) * progress;
+        result << p;
+    }
+    return QVariant::fromValue(result);
+}
+
 TerminalPainter::TerminalPainter(TerminalDisplay *parent)
     : QObject(parent)
     , m_parentDisplay(parent)
 {
+    qRegisterAnimationInterpolator<QPolygonF>(interpolatePolygonF);
     m_cursorAnim = new QVariantAnimation(this);
     m_cursorAnim->setDuration(200);
     m_cursorAnim->setEasingCurve(QEasingCurve::OutCubic); // 滑らかな減速
     connect(m_cursorAnim, &QVariantAnimation::valueChanged, this, &TerminalPainter::updateCursorAnimation);
 }
-
 void TerminalPainter::updateCursorAnimation(const QVariant &value)
 {
-    m_animatedCursorRect = value.toRectF();
+    m_animatedCursorPolygon = value.value<QPolygonF>();
     m_parentDisplay->update(); // 再描画をトリガー（cursorRectを含む領域をupdate）
 }
+QPolygonF createDynamicPolygon(const QRectF &rect, qreal shear, qreal taper)
+{
+    QPolygonF poly;
+    qreal dx = -shear * rect.height();
 
-// カーソル位置が変わった際に呼び出す関数
+    // taper > 0 なら上辺を絞る、taper < 0 なら下辺を絞る
+    qreal topWidthReduction = (taper < 0) ? (rect.width() * -taper) : 0;
+    qreal bottomWidthReduction = (taper > 0) ? (rect.width() * taper) : 0;
+
+    // 頂点計算
+    QPointF topLeft(rect.left() + dx + topWidthReduction, rect.top());
+    QPointF topRight(rect.right() + dx - topWidthReduction, rect.top());
+    QPointF bottomRight(rect.right() - bottomWidthReduction, rect.bottom());
+    QPointF bottomLeft(rect.left() + bottomWidthReduction, rect.bottom());
+
+    poly << topLeft << topRight << bottomRight << bottomLeft;
+    return poly;
+}
+
 void TerminalPainter::onCursorPositionChanged(const QRectF &oldRect, const QRectF &newRect)
 {
     m_cursorAnim->stop();
-    m_cursorAnim->setStartValue(oldRect);
-    m_cursorAnim->setEndValue(newRect);
+
+    // 差分計算
+    qreal deltaX = oldRect.x() - newRect.x();
+    qreal deltaY = oldRect.y() - newRect.y();
+
+    // X方向: Shear（傾き）
+    qreal targetShear = qBound(-0.25, -deltaX * 0.015, 0.25);
+
+    // Y方向: Taper（幅の絞り）
+    // deltaY > 0 (上移動): taperをマイナスにして下辺を絞る
+    // deltaY < 0 (下移動): taperをプラスにして上辺を絞る
+    qreal targetTaper = qBound(-0.3, deltaY * 0.02, 0.3);
+
+    // 開始形状: 現在の移動の「勢い」を乗せる
+    QPolygonF startPoly = createDynamicPolygon(oldRect, targetShear, targetTaper);
+
+    // 終了形状: 元の矩形（shear 0, taper 0）に戻る
+    QPolygonF endPoly = createDynamicPolygon(newRect, 0.0, 0.0);
+
+    m_cursorAnim->setStartValue(QVariant::fromValue(startPoly));
+    m_cursorAnim->setEndValue(QVariant::fromValue(endPoly));
     m_cursorAnim->start();
 }
 
@@ -613,12 +662,6 @@ void TerminalPainter::drawCursor(QPainter &painter,
     const qreal width = qMax(m_parentDisplay->terminalFont()->fontWidth() / 12.0, 1.0);
     const qreal halfWidth = width / 2.0;
 
-    // 1. 前回の位置との差分から移動量を計算
-    qreal deltaX = 0;
-    if (m_lastTargetRect.isValid()) {
-        deltaX = cursorRect.x() - m_lastTargetRect.x();
-    }
-
     if (m_lastTargetRect != cursorRect) {
         QRectF nextRect;
         // 形状に応じた更新領域の計算
@@ -634,27 +677,19 @@ void TerminalPainter::drawCursor(QPainter &painter,
     }
 
     // 描画対象の矩形（アニメーション補間対応）
-    QRectF drawRect = m_animatedCursorRect.isValid() ? m_animatedCursorRect : cursorRect;
 
-    // 2. 傾き（シアー変換）の計算
-    // 上部を移動方向と逆に残すため、deltaXに負の係数を掛けます
-    qreal shearFactor = -deltaX * 0.015;
-    shearFactor = qBound(-0.25, shearFactor, 0.25); // 極端な変形を防止
-
-    // 3. 描画設定の準備
+    QPolygonF drawPoly = !m_animatedCursorPolygon.isEmpty() ? m_animatedCursorPolygon : QPolygonF(cursorRect);
     QColor color = m_parentDisplay->terminalColor()->cursorColor();
     QColor cursorColor = color.isValid() ? color : foregroundColor;
-    // --- 座標変換の開始 ---
-    painter.save();
 
-    // カーソルの下端中央を支点にして傾かせる
-    QTransform transform;
-    transform.translate(drawRect.center().x(), drawRect.bottom());
-    transform.shear(shearFactor, 0);
-    transform.translate(-drawRect.center().x(), -drawRect.bottom());
-    painter.setTransform(transform, true);
-    painter.fillRect(drawRect, cursorColor);
-    painter.restore();
+    // ブラシ（塗りつぶし）を設定
+    painter.setBrush(cursorColor);
+
+    // 枠線が不要な場合は NoPen を設定（カーソルの場合はこちらが一般的です）
+    painter.setPen(Qt::NoPen);
+
+    // drawPolygon を呼び出し（第2引数は省略可能、または FillRule を指定）
+    painter.drawPolygon(drawPoly, Qt::OddEvenFill);
     if (m_parentDisplay->cursorBlinking()) {
         return;
     }
