@@ -679,7 +679,6 @@ void TerminalPainter::drawCursor(QPainter &painter,
     // 描画対象の矩形（アニメーション補間対応）
     QColor color = m_parentDisplay->terminalColor()->cursorColor();
     QColor cursorColor = color.isValid() ? color : foregroundColor;
-
     if (m_cursorAnim->state() == QAbstractAnimation::Running && !m_animatedCursorPolygon.isEmpty()) {
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setBrush(cursorColor);
@@ -690,7 +689,10 @@ void TerminalPainter::drawCursor(QPainter &painter,
     if (m_parentDisplay->cursorBlinking()) {
         return;
     }
-
+    QPen pen(cursorColor);
+    pen.setWidthF(width);
+    pen.setJoinStyle(Qt::MiterJoin);
+    painter.setPen(pen);
     if (m_parentDisplay->cursorShape() == Enum::BlockCursor) {
         if (m_parentDisplay->hasFocus()) {
             painter.fillRect(cursorRect, cursorColor);
