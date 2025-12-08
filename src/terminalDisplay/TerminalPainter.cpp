@@ -685,6 +685,7 @@ void TerminalPainter::drawCursor(QPainter &painter,
         painter.setPen(Qt::NoPen);
         painter.drawPolygon(m_animatedCursorPolygon, Qt::OddEvenFill);
         painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setBrush(Qt::NoBrush);
     }
     if (m_parentDisplay->cursorBlinking()) {
         return;
