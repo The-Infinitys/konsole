@@ -187,6 +187,8 @@ public:
          * to text editing applications )
          */
         BlinkingCursorEnabled,
+        /** (bool) If true, enable smooth cursor animation. */
+        SmoothCursor,
         /** (bool) If true, terminal displays use a fixed color to draw the
          * cursor, specified by the CustomCursorColor property.  Otherwise
          * the cursor changes color to match the character underneath it.
@@ -727,6 +729,11 @@ public:
     bool blinkingCursorEnabled() const
     {
         return property<bool>(Profile::BlinkingCursorEnabled);
+    }
+
+    bool smoothCursor() const
+    {
+        return property<bool>(Profile::SmoothCursor);
     }
 
     /** Convenience method for property<bool>(Profile::FlowControlEnabled) */

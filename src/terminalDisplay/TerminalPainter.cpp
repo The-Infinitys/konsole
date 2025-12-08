@@ -56,6 +56,7 @@ QVariant interpolatePolygonF(const QPolygonF &start, const QPolygonF &end, qreal
 TerminalPainter::TerminalPainter(TerminalDisplay *parent)
     : QObject(parent)
     , m_parentDisplay(parent)
+    , m_lastTargetRect(QRectF()) // ここに初期化を追加
 {
     qRegisterAnimationInterpolator<QPolygonF>(interpolatePolygonF);
     m_cursorAnim = new QVariantAnimation(this);
@@ -659,33 +660,39 @@ void TerminalPainter::drawCursor(QPainter &painter,
                                  const QColor &backgroundColor,
                                  QColor &characterColor)
 {
+    auto currentProfile = SessionManager::instance()->sessionProfile(m_parentDisplay->session());
+    const bool smoothCursorEnabled = currentProfile ? currentProfile->property<bool>(Profile::SmoothCursor) : false;
+
     const qreal width = qMax(m_parentDisplay->terminalFont()->fontWidth() / 12.0, 1.0);
     const qreal halfWidth = width / 2.0;
 
     if (m_lastTargetRect != cursorRect) {
-        QRectF nextRect;
-        // 形状に応じた更新領域の計算
-        if (m_parentDisplay->cursorShape() == Enum::UnderlineCursor) {
-            nextRect = QRectF(cursorRect.left(), cursorRect.bottom() - width, cursorRect.width(), width);
-        } else if (m_parentDisplay->cursorShape() == Enum::IBeamCursor) {
-            nextRect = QRectF(cursorRect.left(), cursorRect.top(), width, cursorRect.height());
-        } else {
-            nextRect = cursorRect;
+        if (smoothCursorEnabled) {
+            QRectF nextRect;
+            // 形状に応じた更新領域の計算
+            if (m_parentDisplay->cursorShape() == Enum::UnderlineCursor) {
+                nextRect = QRectF(cursorRect.left(), cursorRect.bottom() - width, cursorRect.width(), width);
+            } else if (m_parentDisplay->cursorShape() == Enum::IBeamCursor) {
+                nextRect = QRectF(cursorRect.left(), cursorRect.top(), width, cursorRect.height());
+            } else {
+                nextRect = cursorRect;
+            }
+            onCursorPositionChanged(m_lastTargetRect, nextRect);
         }
-        onCursorPositionChanged(m_lastTargetRect, nextRect);
-        m_lastTargetRect = cursorRect;
+        m_lastTargetRect = cursorRect; // アニメーションの有無にかかわらず常に更新
     }
 
     // 描画対象の矩形（アニメーション補間対応）
     QColor color = m_parentDisplay->terminalColor()->cursorColor();
     QColor cursorColor = color.isValid() ? color : foregroundColor;
 
-    if (m_cursorAnim->state() == QAbstractAnimation::Running && !m_animatedCursorPolygon.isEmpty()) {
+    if (smoothCursorEnabled && m_cursorAnim->state() == QAbstractAnimation::Running && !m_animatedCursorPolygon.isEmpty()) {
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setBrush(cursorColor);
         painter.setPen(Qt::NoPen);
         painter.drawPolygon(m_animatedCursorPolygon, Qt::OddEvenFill);
         painter.setRenderHint(QPainter::Antialiasing, false);
+        return; // アニメーション中はここで描画を完了する
     }
     if (m_parentDisplay->cursorBlinking()) {
         return;
