@@ -1279,7 +1279,7 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
         int closeSignal = -1;
         QString applicationName;
 
-        for (QString param: std::as_const(params)) {
+        for (QString param : std::as_const(params)) {
             if (param.startsWith(QString::fromLatin1("i="))) {
                 // Notification ID:
                 QString payloadValue = param.mid(2);
@@ -1295,13 +1295,13 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
                 // Whether the notification is complete:
                 bool parseOk;
                 int parsedComplete = param.mid(2).toInt(&parseOk);
-                if (parseOk && parsedComplete >=0 && parsedComplete < 2)
+                if (parseOk && parsedComplete >= 0 && parsedComplete < 2)
                     complete = parsedComplete;
             } else if (param.startsWith(QString::fromLatin1("e="))) {
                 // Escape (whether the paylaod is Base64 encoded):
                 bool parseOk;
                 int parsedEncoding = param.mid(2).toInt(&parseOk);
-                if (parseOk && parsedEncoding >=0 && parsedEncoding < 2)
+                if (parseOk && parsedEncoding >= 0 && parsedEncoding < 2)
                     encoding = parsedEncoding;
             } else if (param.startsWith(QString::fromLatin1("a="))) {
                 // Parse a comma-separated of actions with optional "-" (eg. "-focus,report"):
@@ -1364,7 +1364,7 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
             }
         }
 
-        KittyNotificationState* notificationState = nullptr;
+        KittyNotificationState *notificationState = nullptr;
         KittyNotificationState notificationValue;
         auto notificationIterator = _kittyNotifications.find(notificationId);
         if (notificationIterator != _kittyNotifications.end()) {
@@ -1398,23 +1398,23 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
         }
         constexpr qsizetype max_notification_size = 1024;
         switch (payloadType) {
-            case Unknown:
-                break;
-            case Query:
-                _kittyNotifications.remove(notificationId);
-                sendString((QStringLiteral("\033]99;i=") + notificationId
-                            + QStringLiteral(";p=?;p=title,body,buttons:a=report,focus:o=always,unfocus,invisible:u=0,1,2:c=1\033\\"))
-                               .toLatin1());
-                return;
-            case Title:
-                notificationState->title += payload.left(max_notification_size - notificationState->title.size());
-                break;
-            case Body:
-                notificationState->body += payload.left(max_notification_size - notificationState->body.size());
-                break;
-            case Buttons:
-                notificationState->buttons = payload.split(QString::fromUtf8(u8"\u2028"));
-                break;
+        case Unknown:
+            break;
+        case Query:
+            _kittyNotifications.remove(notificationId);
+            sendString((QStringLiteral("\033]99;i=") + notificationId
+                        + QStringLiteral(";p=?;p=title,body,buttons:a=report,focus:o=always,unfocus,invisible:u=0,1,2:c=1\033\\"))
+                           .toLatin1());
+            return;
+        case Title:
+            notificationState->title += payload.left(max_notification_size - notificationState->title.size());
+            break;
+        case Body:
+            notificationState->body += payload.left(max_notification_size - notificationState->body.size());
+            break;
+        case Buttons:
+            notificationState->buttons = payload.split(QString::fromUtf8(u8"\u2028"));
+            break;
         }
 
         if (complete) {
@@ -1425,57 +1425,57 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
             default:
             case KittyNotificationOption::None:
             case KittyNotificationOption::Always:
-                    enabled = true;
-                    break;
+                enabled = true;
+                break;
             case KittyNotificationOption::Unfocused:
-                    enabled = !hasFocus;
-                    break;
+                enabled = !hasFocus;
+                break;
             case KittyNotificationOption::Invisible:
-                    // We might want to check if the tab is active, the window visible, etc.
-                    enabled = !hasFocus;
-                    break;
+                // We might want to check if the tab is active, the window visible, etc.
+                enabled = !hasFocus;
+                break;
             }
 
             if (enabled) {
-                    KNotification *notification;
-                    QString iconName = resolveIcon(notificationState->iconNames);
+                KNotification *notification;
+                QString iconName = resolveIcon(notificationState->iconNames);
 
-                    // KNotification does not support application name, add it to the title instead:
-                    QString fullTitle = notificationState->applicationName;
-                    if (!notificationState->title.isEmpty()) {
+                // KNotification does not support application name, add it to the title instead:
+                QString fullTitle = notificationState->applicationName;
+                if (!notificationState->title.isEmpty()) {
                     if (!fullTitle.isEmpty())
                         fullTitle += QStringLiteral(": ");
                     fullTitle += notificationState->title;
-                    }
+                }
 
-                    notification = KNotification::event(hasFocus ? QStringLiteral("ProcessNotification") : QStringLiteral("ProcessNotificationHidden"),
-                                                        fullTitle,
-                                                        notificationState->body.toHtmlEscaped(),
-                                                        iconName);
+                notification = KNotification::event(hasFocus ? QStringLiteral("ProcessNotification") : QStringLiteral("ProcessNotificationHidden"),
+                                                    fullTitle,
+                                                    notificationState->body.toHtmlEscaped(),
+                                                    iconName);
 
-                    KNotification::Urgency resultUrgency = KNotification::Urgency::NormalUrgency;
-                    switch (notificationState->urgency) {
-                    case 0:
+                KNotification::Urgency resultUrgency = KNotification::Urgency::NormalUrgency;
+                switch (notificationState->urgency) {
+                case 0:
                     resultUrgency = KNotification::Urgency::LowUrgency;
                     break;
-                    case 1:
+                case 1:
                     resultUrgency = KNotification::Urgency::NormalUrgency;
                     break;
-                    case 2:
+                case 2:
                     resultUrgency = KNotification::Urgency::CriticalUrgency;
                     break;
-                    }
-                    notification->setUrgency(resultUrgency);
-                    auto action = notification->addDefaultAction(i18n("Show session"));
+                }
+                notification->setUrgency(resultUrgency);
+                auto action = notification->addDefaultAction(i18n("Show session"));
 
-                    if (notificationState->closeSignal) {
+                if (notificationState->closeSignal) {
                     connect(notification, &KNotification::closed, this, [this, notificationId]() {
                         sendString((QStringLiteral("\033]99;i=") + notificationId + QStringLiteral(":p=close;\033\\")).toLatin1());
                     });
-                    }
+                }
 
-                    int notificationAction = notificationState->action;
-                    if (notificationAction != 0) {
+                int notificationAction = notificationState->action;
+                if (notificationAction != 0) {
                     connect(action, &KNotificationAction::activated, this, [this, notification, notificationAction, notificationId]() {
                         if (notificationAction & NotificationActionReport) {
                             sendString((QStringLiteral("\033]99;i=") + notificationId + QStringLiteral(";\033\\")).toLatin1());
@@ -1484,26 +1484,26 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
                             _currentScreen->currentTerminalDisplay()->notificationClicked(notification->xdgActivationToken());
                         }
                     });
-                    }
+                }
 
-                    for (int i = 0; i < notificationState->buttons.size(); ++i) {
+                for (int i = 0; i < notificationState->buttons.size(); ++i) {
                     KNotificationAction *action = notification->addAction(notificationState->buttons[i]);
                     connect(action, &KNotificationAction::activated, this, [this, notificationId, i]() {
                         sendString((QStringLiteral("\033]99;i=") + notificationId + QStringLiteral(";") + QString::number(i + 1) + QStringLiteral("\033\\"))
                                        .toLatin1());
                     });
-                    }
+                }
             }
 
             _kittyNotifications.remove(notificationId);
         }
 
         if (_kittyNotifications.size() >= 10) {
-            auto toRemote = std::min_element(
-                _kittyNotifications.begin(), _kittyNotifications.end(),
-                [](KittyNotificationState const& first, KittyNotificationState const& second) {
-                    return first.serial < second.serial;
-                });
+            auto toRemote = std::min_element(_kittyNotifications.begin(),
+                                             _kittyNotifications.end(),
+                                             [](KittyNotificationState const &first, KittyNotificationState const &second) {
+                                                 return first.serial < second.serial;
+                                             });
             _kittyNotifications.erase(toRemote);
         }
 
@@ -1520,6 +1520,7 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
     if (attribute == Session::ProfileChange) {
         bool styleChanged = false;
         bool isBlinking = false;
+        bool isAnimating = false;
         Enum::CursorShapeEnum shape = Enum::BlockCursor;
         QColor customColor;
 
@@ -1536,6 +1537,7 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
 
         const QLatin1String cursorShapeStr("CursorShape=");
         const QLatin1String blinkingCursorStr("BlinkingCursorEnabled=");
+        const QLatin1String animatingCursorStr("AnimatingCursorEnabled=");
         const QLatin1String customCursorColorStr("CustomCursorColor=");
 
         QString newValue;
@@ -1562,7 +1564,22 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
                         styleChanged = true;
                     }
                 }
-
+            } else if (item.startsWith(animatingCursorStr)) {
+                const auto str = item.mid(animatingCursorStr.size());
+                if (str.compare(QString::fromLatin1("true"), Qt::CaseInsensitive) == 0) {
+                    isAnimating = true;
+                    styleChanged = true;
+                } else if (str.compare(QString::fromLatin1("false"), Qt::CaseInsensitive) == 0) {
+                    isAnimating = false;
+                    styleChanged = true;
+                } else {
+                    bool ok = false;
+                    bool newIsAnimating = str.toInt(&ok);
+                    if (ok) {
+                        isAnimating = newIsAnimating;
+                        styleChanged = true;
+                    }
+                }
             } else if (item.startsWith(customCursorColorStr)) {
                 const auto colorStr = item.mid(customCursorColorStr.size());
                 customColor = QColor(colorStr);
@@ -1576,7 +1593,7 @@ void Vt102Emulation::processSessionAttributeRequest(const int tokenSize, const u
         }
 
         if (styleChanged) {
-            Q_EMIT setCursorStyleRequest(shape, isBlinking, customColor);
+            Q_EMIT setCursorStyleRequest(shape, isBlinking, isAnimating, customColor);
         }
 
         if (newValue.isEmpty()) {
@@ -3453,7 +3470,7 @@ bool Vt102Emulation::processSixel(uint cc)
     default:
         break;
     }
-    QList<char32_t>& s = tokenBuffer;
+    QList<char32_t> &s = tokenBuffer;
     const int p = tokenBufferPos;
 
     if (!m_SixelStarted && (sixel() || s[0] == '!' || s[0] == '#')) {
