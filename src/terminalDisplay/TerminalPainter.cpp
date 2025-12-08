@@ -44,6 +44,25 @@ TerminalPainter::TerminalPainter(TerminalDisplay *parent)
     : QObject(parent)
     , m_parentDisplay(parent)
 {
+    m_cursorAnim = new QVariantAnimation(this);
+    m_cursorAnim->setDuration(100);
+    m_cursorAnim->setEasingCurve(QEasingCurve::OutCubic); // 滑らかな減速
+    connect(m_cursorAnim, &QVariantAnimation::valueChanged, this, &TerminalPainter::updateCursorAnimation);
+}
+
+void TerminalPainter::updateCursorAnimation(const QVariant &value)
+{
+    m_animatedCursorRect = value.toRectF();
+    m_parentDisplay->update(); // 再描画をトリガー（cursorRectを含む領域をupdate）
+}
+
+// カーソル位置が変わった際に呼び出す関数
+void TerminalPainter::onCursorPositionChanged(const QRectF &newRect)
+{
+    m_cursorAnim->stop();
+    m_cursorAnim->setStartValue(m_animatedCursorRect);
+    m_cursorAnim->setEndValue(newRect);
+    m_cursorAnim->start();
 }
 
 static inline bool isLineCharString(const QString &string, bool braille)
@@ -585,24 +604,28 @@ void TerminalPainter::updateCursorTextColor(const QColor &backgroundColor, QColo
     }
 }
 
-void TerminalPainter::drawCursor(QPainter &painter, const QRectF &cursorRect, const QColor &foregroundColor, const QColor &backgroundColor, QColor &characterColor)
+void TerminalPainter::drawCursor(QPainter &painter,
+                                 const QRectF &cursorRect,
+                                 const QColor &foregroundColor,
+                                 const QColor &backgroundColor,
+                                 QColor &characterColor)
 {
-    if (m_parentDisplay->cursorBlinking()) {
-        return;
-    }
+    onCursorPositionChanged(cursorRect);
+    QRectF drawRect = m_animatedCursorRect.isValid() ? m_animatedCursorRect : cursorRect;
 
     QColor color = m_parentDisplay->terminalColor()->cursorColor();
     QColor cursorColor = color.isValid() ? color : foregroundColor;
 
     QPen pen(cursorColor);
     pen.setJoinStyle(Qt::MiterJoin);
-    // TODO: the relative pen width to draw the cursor is a bit hacky
-    // and set to 1/12 of the font width. Visually it seems to work at
-    // all scales but there must be better ways to do it
     const qreal width = qMax(m_parentDisplay->terminalFont()->fontWidth() / 12.0, 1.0);
     const qreal halfWidth = width / 2.0;
     pen.setWidthF(width);
     painter.setPen(pen);
+    painter.fillRect(drawRect, cursorColor);
+    if (m_parentDisplay->cursorBlinking()) {
+        return;
+    }
 
     if (m_parentDisplay->cursorShape() == Enum::BlockCursor) {
         if (m_parentDisplay->hasFocus()) {
