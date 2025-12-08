@@ -91,10 +91,56 @@ private:
     void drawCursor(QPainter &painter, const QRectF &cursorRect, const QColor &foregroundColor, const QColor &backgroundColor, QColor &characterColor);
 
     TerminalDisplay *m_parentDisplay = nullptr;
+    void drawBelowText(QPainter &painter,
+                       const QRect &rect,
+                       Character *style,
+                       int startX,
+                       int width,
+                       int fontWidth,
+                       const QColor *colorTable,
+                       const bool invertedRendition,
+                       int *vis2line,
+                       int *line2log,
+                       bool bidiEnabled,
+                       int lastNonSpace,
+                       QColor background,
+                       int Y,
+                       QRegion sixelRegion);
+    void drawAboveText(QPainter &painter,
+                       const QRect &rect,
+                       Character *style,
+                       int startX,
+                       int width,
+                       int fontWidth,
+                       const QColor *colorTable,
+                       const bool invertedRendition,
+                       int *vis2line,
+                       int *line2log,
+                       bool bidiEnabled,
+                       int lastNonSpace,
+                       CharacterColor const *ulColorTable);
+    void drawImagesBelowText(QPainter &painter, const QRect &rect, int fontWidth, int fontHeight, int &placementIdx, QRegion &sixelRegion);
+    void drawImagesAboveText(QPainter &painter, const QRect &rect, int fontWidth, int fontHeight, int &placementIdx);
 
-    QPolygonF m_animatedCursorPolygon;
-
+    void drawTextCharacters(QPainter &painter,
+                            const QRect &rect,
+                            const QString &text,
+                            Character style,
+                            const QColor *colorTable,
+                            const bool invertedRendition,
+                            const LineProperty lineProperty,
+                            bool printerFriendly,
+                            RenditionFlags &oldRendition,
+                            QColor oldColor,
+                            QFont::Weight normalWeight,
+                            QFont::Weight boldWeight);
     void updateCursorAnimation(const QVariant &value); // 引数の QVariant は内部で QPolygonF を扱う
     void onCursorPositionChanged(const QRectF &oldRect, const QRectF &newRect);
+    QVariantAnimation *m_cursorAnim;
+    QRectF m_lastTargetRect;
+    QPolygonF m_animatedCursorPolygon;
+};
+
+}
 
 #endif
