@@ -10,8 +10,9 @@
 #define TERMINALPAINTER_HPP
 
 // Qt
+#include <QRectF>
+#include <QVariantAnimation>
 #include <QVector>
-
 // Konsole
 #include "../characters/Character.h"
 #include "Enumeration.h"
@@ -132,6 +133,11 @@ private:
                             QColor oldColor,
                             QFont::Weight normalWeight,
                             QFont::Weight boldWeight);
+    void updateCursorAnimation(const QVariant &value);
+    void onCursorPositionChanged(const QRectF &newRect);
+    QVariantAnimation *m_cursorAnim;
+    QRectF m_lastTargetRect; // 前回の論理位置（変更検知用）
+    QRectF m_animatedCursorRect;
 };
 
 }
