@@ -134,7 +134,7 @@ private:
                             QFont::Weight normalWeight,
                             QFont::Weight boldWeight);
     void updateCursorAnimation(const QVariant &value);
-    void onCursorPositionChanged(const QRectF &newRect);
+    void onCursorPositionChanged(const QRectF &oldRect, const QRectF &newRect);
     QVariantAnimation *m_cursorAnim;
     QRectF m_lastTargetRect; // 前回の論理位置（変更検知用）
     QRectF m_animatedCursorRect;

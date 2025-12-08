@@ -45,7 +45,7 @@ TerminalPainter::TerminalPainter(TerminalDisplay *parent)
     , m_parentDisplay(parent)
 {
     m_cursorAnim = new QVariantAnimation(this);
-    m_cursorAnim->setDuration(100);
+    m_cursorAnim->setDuration(200);
     m_cursorAnim->setEasingCurve(QEasingCurve::OutCubic); // 滑らかな減速
     connect(m_cursorAnim, &QVariantAnimation::valueChanged, this, &TerminalPainter::updateCursorAnimation);
 }
@@ -57,10 +57,10 @@ void TerminalPainter::updateCursorAnimation(const QVariant &value)
 }
 
 // カーソル位置が変わった際に呼び出す関数
-void TerminalPainter::onCursorPositionChanged(const QRectF &newRect)
+void TerminalPainter::onCursorPositionChanged(const QRectF &oldRect, const QRectF &newRect)
 {
     m_cursorAnim->stop();
-    m_cursorAnim->setStartValue(m_animatedCursorRect);
+    m_cursorAnim->setStartValue(oldRect);
     m_cursorAnim->setEndValue(newRect);
     m_cursorAnim->start();
 }
@@ -610,19 +610,51 @@ void TerminalPainter::drawCursor(QPainter &painter,
                                  const QColor &backgroundColor,
                                  QColor &characterColor)
 {
-    onCursorPositionChanged(cursorRect);
-    QRectF drawRect = m_animatedCursorRect.isValid() ? m_animatedCursorRect : cursorRect;
-
-    QColor color = m_parentDisplay->terminalColor()->cursorColor();
-    QColor cursorColor = color.isValid() ? color : foregroundColor;
-
-    QPen pen(cursorColor);
-    pen.setJoinStyle(Qt::MiterJoin);
     const qreal width = qMax(m_parentDisplay->terminalFont()->fontWidth() / 12.0, 1.0);
     const qreal halfWidth = width / 2.0;
-    pen.setWidthF(width);
-    painter.setPen(pen);
+
+    // 1. 前回の位置との差分から移動量を計算
+    qreal deltaX = 0;
+    if (m_lastTargetRect.isValid()) {
+        deltaX = cursorRect.x() - m_lastTargetRect.x();
+    }
+
+    if (m_lastTargetRect != cursorRect) {
+        QRectF nextRect;
+        // 形状に応じた更新領域の計算
+        if (m_parentDisplay->cursorShape() == Enum::UnderlineCursor) {
+            nextRect = QRectF(cursorRect.left(), cursorRect.bottom() - width, cursorRect.width(), width);
+        } else if (m_parentDisplay->cursorShape() == Enum::IBeamCursor) {
+            nextRect = QRectF(cursorRect.left(), cursorRect.top(), width, cursorRect.height());
+        } else {
+            nextRect = cursorRect;
+        }
+        onCursorPositionChanged(m_lastTargetRect, nextRect);
+        m_lastTargetRect = cursorRect;
+    }
+
+    // 描画対象の矩形（アニメーション補間対応）
+    QRectF drawRect = m_animatedCursorRect.isValid() ? m_animatedCursorRect : cursorRect;
+
+    // 2. 傾き（シアー変換）の計算
+    // 上部を移動方向と逆に残すため、deltaXに負の係数を掛けます
+    qreal shearFactor = -deltaX * 0.015;
+    shearFactor = qBound(-0.25, shearFactor, 0.25); // 極端な変形を防止
+
+    // 3. 描画設定の準備
+    QColor color = m_parentDisplay->terminalColor()->cursorColor();
+    QColor cursorColor = color.isValid() ? color : foregroundColor;
+    // --- 座標変換の開始 ---
+    painter.save();
+
+    // カーソルの下端中央を支点にして傾かせる
+    QTransform transform;
+    transform.translate(drawRect.center().x(), drawRect.bottom());
+    transform.shear(shearFactor, 0);
+    transform.translate(-drawRect.center().x(), -drawRect.bottom());
+    painter.setTransform(transform, true);
     painter.fillRect(drawRect, cursorColor);
+    painter.restore();
     if (m_parentDisplay->cursorBlinking()) {
         return;
     }
