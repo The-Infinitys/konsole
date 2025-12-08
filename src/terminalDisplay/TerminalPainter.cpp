@@ -677,19 +677,16 @@ void TerminalPainter::drawCursor(QPainter &painter,
     }
 
     // 描画対象の矩形（アニメーション補間対応）
-
-    QPolygonF drawPoly = !m_animatedCursorPolygon.isEmpty() ? m_animatedCursorPolygon : QPolygonF(cursorRect);
     QColor color = m_parentDisplay->terminalColor()->cursorColor();
     QColor cursorColor = color.isValid() ? color : foregroundColor;
 
-    // ブラシ（塗りつぶし）を設定
-    painter.setBrush(cursorColor);
-
-    // 枠線が不要な場合は NoPen を設定（カーソルの場合はこちらが一般的です）
-    painter.setPen(Qt::NoPen);
-
-    // drawPolygon を呼び出し（第2引数は省略可能、または FillRule を指定）
-    painter.drawPolygon(drawPoly, Qt::OddEvenFill);
+    if (m_cursorAnim->state() == QAbstractAnimation::Running && !m_animatedCursorPolygon.isEmpty()) {
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setBrush(cursorColor);
+        painter.setPen(Qt::NoPen);
+        painter.drawPolygon(m_animatedCursorPolygon, Qt::OddEvenFill);
+        painter.setRenderHint(QPainter::Antialiasing, false);
+    }
     if (m_parentDisplay->cursorBlinking()) {
         return;
     }
